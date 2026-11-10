@@ -1,7 +1,7 @@
 //! Item layouts, ported from `storage/norcow_bitwise.h` and
 //! `storage/norcow_blockwise.h`.
 
-use crate::{BitFlash, Data, Flash, Item, KEY_DELETED, KEY_FREE, KEY_LEN, LEN_LEN, Norcow};
+use super::{BitFlash, Data, Flash, Item, KEY_DELETED, KEY_FREE, KEY_LEN, LEN_LEN, Norcow};
 
 /// Largest `FLASH_BLOCK_WORDS` of any layout.
 pub(crate) const MAX_BLOCK_WORDS: usize = 4;
@@ -60,8 +60,9 @@ pub trait Layout<F: Flash>: LayoutParams + Sized {
         len: u16,
     ) -> bool;
 
+    /// Sets `count` to `Some` wherever the C code writes its out-parameter.
     #[doc(hidden)]
-    fn next_counter(n: &mut Norcow<F, Self>, key: u16, count: &mut u32) -> bool;
+    fn next_counter(n: &mut Norcow<F, Self>, key: u16, count: &mut Option<u32>) -> bool;
 
     #[doc(hidden)]
     fn update_bytes(n: &mut Norcow<F, Self>, key: u16, data: Data<'_>, len: u16) -> bool;
@@ -251,10 +252,10 @@ impl<F: BitFlash> Layout<F> for Bitwise {
         updated
     }
 
-    fn next_counter(n: &mut Norcow<F, Self>, key: u16, count: &mut u32) -> bool {
+    fn next_counter(n: &mut Norcow<F, Self>, key: u16, count: &mut Option<u32>) -> bool {
         let sector = n.active_sector;
         let Some(item) = n.find_item(sector, key) else {
-            *count = 0;
+            *count = Some(0);
             return n.set_counter(key, 0);
         };
 
@@ -273,22 +274,24 @@ impl<F: BitFlash> Layout<F> for Bitwise {
             i += 1;
         }
 
-        *count = base.wrapping_add(1).wrapping_add(32 * (i - 1));
-        if *count < base {
+        let mut value = base.wrapping_add(1).wrapping_add(32 * (i - 1));
+        *count = Some(value);
+        if value < base {
             // Value overflow.
             return false;
         }
 
         if i < len_words {
             let tally = word(i);
-            *count = count.wrapping_add((!tally).count_ones());
-            if *count < base {
+            value = value.wrapping_add((!tally).count_ones());
+            *count = Some(value);
+            if value < base {
                 // Value overflow.
                 return false;
             }
             n.update_word(key, 4 * i, tally >> 1)
         } else {
-            n.set_counter(key, *count)
+            n.set_counter(key, value)
         }
     }
 
@@ -543,10 +546,10 @@ impl<F: Flash> Layout<F> for Blockwise {
         true
     }
 
-    fn next_counter(n: &mut Norcow<F, Self>, key: u16, count: &mut u32) -> bool {
+    fn next_counter(n: &mut Norcow<F, Self>, key: u16, count: &mut Option<u32>) -> bool {
         let sector = n.active_sector;
         let Some(item) = n.find_item(sector, key) else {
-            *count = 0;
+            *count = Some(0);
             return n.set_counter(key, 0);
         };
 
@@ -555,12 +558,13 @@ impl<F: Flash> Layout<F> for Blockwise {
         }
 
         let stored = n.read_item_word(sector, item.val_offset);
-        *count = stored.wrapping_add(1);
-        if *count < stored {
+        let value = stored.wrapping_add(1);
+        *count = Some(value);
+        if value < stored {
             // Value overflow.
             return false;
         }
-        n.set_counter(key, *count)
+        n.set_counter(key, value)
     }
 
     fn update_bytes(n: &mut Norcow<F, Self>, key: u16, data: Data<'_>, len: u16) -> bool {

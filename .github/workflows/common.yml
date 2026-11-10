@@ -115,12 +115,12 @@ jobs:
           submodules: recursive
       - uses: ./.github/actions/environment
       - run: unset PYTEST_TIMEOUT
-      # norcow.c (still used by Trezor One)
+      # storage.c and norcow.c (still used by Trezor One)
       - run: $UV_RUN make -C storage/tests build
       - run: $UV_RUN make -C storage/tests tests_all
-      # rust/trezor-norcow (used by Trezor Core)
+      # rust/trezor-storage (used by Trezor Core)
       - run: $UV_RUN make -C storage/tests clean
-      - run: $UV_RUN make -C storage/tests build NORCOW_IMPL=rust
+      - run: $UV_RUN make -C storage/tests build STORAGE_IMPL=rust
       - run: $UV_RUN make -C storage/tests tests_all
 
   docs_build:

@@ -765,7 +765,7 @@ dependencies = [
  "models",
  "rtl",
  "sys",
- "trezor-norcow",
+ "trezor-storage",
  "xbuild",
 ]
 
@@ -998,7 +998,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "trezor-norcow"
+name = "trezor-storage"
 version = "0.1.0"
 
 [[package]]

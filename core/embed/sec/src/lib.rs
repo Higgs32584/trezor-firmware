@@ -3,10 +3,10 @@
 #![feature(custom_test_frameworks)]
 #![reexport_test_harness_main = "test_main"]
 
-// Norcow is implemented in Rust; `storage.c` calls its C ABI. Nothing in Rust
-// refers to the crate, so pull it into the link explicitly.
+// The storage is implemented in Rust and exports the C ABI of `storage.h`.
+// Nothing in Rust refers to the crate, so pull it into the link explicitly.
 #[cfg(all(feature = "storage", feature = "secure_mode"))]
-extern crate trezor_norcow;
+extern crate trezor_storage;
 
 #[cfg(test)]
 #[unsafe(no_mangle)]

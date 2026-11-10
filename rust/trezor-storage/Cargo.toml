@@ -1,0 +1,41 @@
+[package]
+name = "trezor-storage"
+version = "0.1.0"
+edition = "2024"
+description = "The Trezor storage: NORCOW flash store, PIN verification and encryption"
+license = "GPL-3.0-or-later"
+
+[features]
+# Build the C ABI of `storage/storage.h` on top of the C crypto library,
+# flash driver and platform functions, through `storage/storage_rs_glue.c`.
+# Enabled by the layout features below.
+ffi = []
+
+# Flash layout. Exactly one should be enabled; if both end up enabled
+# (Cargo features are additive, and the emulator of a STM32U5 model enables
+# both), `bitwise` wins, mirroring `core/embed/sys/flash/build.rs`.
+#
+# Flash with bit access (`FLASH_BIT_ACCESS`, `FLASH_BLOCK_WORDS == 1`):
+# STM32F4 and all emulators.
+bitwise = ["ffi"]
+# Flash written in 16-byte blocks (`FLASH_BLOCK_WORDS == 4`): STM32U5.
+blockwise = ["ffi"]
+
+# Optiga secure element (`USE_OPTIGA`).
+optiga = []
+# Tropic secure element (`USE_TROPIC`).
+tropic = []
+# Hardware-bound storage key (`USE_STORAGE_HWKEY`). Ignored with `emulator`,
+# which has no hardware key regardless of the MCU it emulates.
+hwkey = []
+# Emulator build (`TREZOR_EMULATOR`).
+emulator = []
+
+# Link against `std`. Only needed to build a host staticlib for the C test
+# harness in `storage/tests/c`.
+std = []
+
+[lib]
+# The test harness builds a staticlib with
+# `cargo rustc --lib --crate-type staticlib`; firmware links the rlib.
+crate-type = ["rlib"]

@@ -77,7 +77,7 @@ pareen = { version = "0.3.3", path = "../../rust/pareen", default-features = fal
 qrcodegen-no-heap = { version = "1.8.1", path = "../vendor/QR-Code-generator/rust-no-heap" }
 spin = { version = "0.9.9", features = ["rwlock", "spin_mutex", "lazy"], default-features = false }
 static-alloc = "0.2.6"
-trezor-norcow = { path = "../../rust/trezor-norcow" }
+trezor-storage = { path = "../../rust/trezor-storage" }
 trezor-thp = { path = "../../rust/trezor-thp" }
 trezor-tjpgdec = { version = "0.1.0", path = "../../rust/trezor-tjpgdec" }
 trezor-ward = { path = "../../rust/trezor-ward" }

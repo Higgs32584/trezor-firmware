@@ -32,20 +32,44 @@
 #include "memzero.h"
 
 MP_REGISTER_ROOT_POINTER(mp_obj_t trezorconfig_ui_wait_callback);
+// Exception raised by the UI callback, re-raised once the storage call that
+// invoked the callback has returned.
+MP_REGISTER_ROOT_POINTER(mp_obj_t trezorconfig_ui_wait_exception);
 
 static secbool wrapped_ui_wait_callback(uint32_t wait, uint32_t progress,
                                         enum storage_ui_message_t message) {
+  if (MP_STATE_VM(trezorconfig_ui_wait_exception) != MP_OBJ_NULL) {
+    // The callback raised earlier in this operation: keep cancelling it.
+    return sectrue;
+  }
   if (mp_obj_is_callable(MP_STATE_VM(trezorconfig_ui_wait_callback))) {
     mp_obj_t args[3] = {0};
     args[0] = mp_obj_new_int(wait);
     args[1] = mp_obj_new_int(progress);
     args[2] = mp_obj_new_int(message);
-    if (mp_call_function_n_kw(MP_STATE_VM(trezorconfig_ui_wait_callback), 3, 0,
-                              args) == mp_const_true) {
-      return sectrue;
+    // An exception must not unwind (longjmp) through the storage, which is
+    // implemented in Rust: catch it, cancel the operation and re-raise the
+    // exception after the storage returns.
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+      mp_obj_t ret = mp_call_function_n_kw(
+          MP_STATE_VM(trezorconfig_ui_wait_callback), 3, 0, args);
+      nlr_pop();
+      return (ret == mp_const_true) ? sectrue : secfalse;
     }
+    MP_STATE_VM(trezorconfig_ui_wait_exception) = MP_OBJ_FROM_PTR(nlr.ret_val);
+    return sectrue;
   }
   return secfalse;
+}
+
+// Re-raises an exception caught by wrapped_ui_wait_callback().
+static void raise_ui_wait_exception(void) {
+  mp_obj_t exc = MP_STATE_VM(trezorconfig_ui_wait_exception);
+  if (exc != MP_OBJ_NULL) {
+    MP_STATE_VM(trezorconfig_ui_wait_exception) = MP_OBJ_NULL;
+    nlr_raise(exc);
+  }
 }
 
 /// def init(
@@ -64,6 +88,7 @@ static mp_obj_t mod_trezorconfig_init(size_t n_args, const mp_obj_t *args) {
   } else {
     storage_setup(NULL);
   }
+  raise_ui_wait_exception();
   return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_trezorconfig_init_obj, 0, 1,
@@ -87,7 +112,10 @@ static mp_obj_t mod_trezorconfig_unlock(mp_obj_t pin, mp_obj_t ext_salt) {
                    MP_ERROR_TEXT("Invalid length of external salt."));
   }
 
-  switch (storage_unlock(pin_b.buf, pin_b.len, ext_salt_b.buf)) {
+  storage_unlock_result_t result =
+      storage_unlock(pin_b.buf, pin_b.len, ext_salt_b.buf);
+  raise_ui_wait_exception();
+  switch (result) {
     case UNLOCK_OK:
       return mp_const_true;
     case UNLOCK_NOT_INITIALIZED:
@@ -223,7 +251,10 @@ static mp_obj_t mod_trezorconfig_change_pin(size_t n_args,
     new_ext_salt = ext_salt_b.buf;
   }
 
-  switch (storage_change_pin(newpin.buf, newpin.len, new_ext_salt)) {
+  storage_pin_change_result_t result =
+      storage_change_pin(newpin.buf, newpin.len, new_ext_salt);
+  raise_ui_wait_exception();
+  switch (result) {
     case PIN_CHANGE_OK:
       return mp_const_true;
     case PIN_CHANGE_WIPE_CODE:
@@ -258,6 +289,7 @@ static mp_obj_t mod_trezorconfig_ensure_not_wipe_code(mp_obj_t pin) {
   mp_buffer_info_t pin_b = {0};
   mp_get_buffer_raise(pin, &pin_b, MP_BUFFER_READ);
   storage_ensure_not_wipe_code(pin_b.buf, pin_b.len);
+  raise_ui_wait_exception();
   return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mod_trezorconfig_ensure_not_wipe_code_obj,
@@ -302,8 +334,10 @@ static mp_obj_t mod_trezorconfig_change_wipe_code(size_t n_args,
     ext_salt = ext_salt_b.buf;
   }
 
-  if (sectrue != storage_change_wipe_code(pin_b.buf, pin_b.len, ext_salt,
-                                          wipe_code_b.buf, wipe_code_b.len)) {
+  secbool result = storage_change_wipe_code(pin_b.buf, pin_b.len, ext_salt,
+                                            wipe_code_b.buf, wipe_code_b.len);
+  raise_ui_wait_exception();
+  if (sectrue != result) {
     return mp_const_false;
   }
   return mp_const_true;
@@ -468,6 +502,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_trezorconfig_next_counter_obj, 2,
 ///     """
 static mp_obj_t mod_trezorconfig_wipe(void) {
   storage_wipe();
+  raise_ui_wait_exception();
   return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorconfig_wipe_obj,

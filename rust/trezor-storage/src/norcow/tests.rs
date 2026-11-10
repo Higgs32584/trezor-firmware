@@ -12,7 +12,7 @@
 
 use std::ffi::CStr;
 
-use crate::*;
+use crate::norcow::*;
 
 const SECTOR_SIZE: u32 = 0x10000;
 const VERSION: u32 = 6;
@@ -186,10 +186,10 @@ const LENGTHS: &[usize] = &[
 macro_rules! both_layouts {
     ($($name:ident),* $(,)?) => {
         mod bitwise {
-            $( #[test] fn $name() { super::$name::<crate::Bitwise>(); } )*
+            $( #[test] fn $name() { super::$name::<crate::norcow::Bitwise>(); } )*
         }
         mod blockwise {
-            $( #[test] fn $name() { super::$name::<crate::Blockwise>(); } )*
+            $( #[test] fn $name() { super::$name::<crate::norcow::Blockwise>(); } )*
         }
     };
 }

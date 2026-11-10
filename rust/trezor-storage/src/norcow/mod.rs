@@ -1,22 +1,17 @@
 //! NORCOW ("NOR Copy-On-Write") is the flash key-value store underneath the
-//! Trezor storage (`storage/storage.c`).
+//! storage.
 //!
-//! This crate is a Rust port of `storage/norcow.c` together with
-//! `norcow_bitwise.h` and `norcow_blockwise.h`. The flash format is
-//! unchanged, byte for byte, and so is the observable behavior of every
-//! function in `storage/norcow.h`, including the corner cases that existing
-//! devices may depend on (see the comments marked "Same as C").
-//!
-//! The crate is split into three layers:
+//! A Rust port of `storage/norcow.c` together with `norcow_bitwise.h` and
+//! `norcow_blockwise.h`. The flash format is unchanged, byte for byte, and so
+//! is the behavior of every operation of `storage/norcow.h`, including the
+//! corner cases that existing devices may depend on (see the comments marked
+//! "Same as C").
 //!
 //! * [`Norcow`] holds the sector bookkeeping and implements the operations
-//!   that do not depend on the item layout. It is written in safe Rust and
-//!   addresses flash only through sector offsets, never through pointers.
+//!   that do not depend on the item layout. It addresses flash only through
+//!   sector offsets, never through pointers.
 //! * [`Layout`] implementations ([`Bitwise`], [`Blockwise`]) encode and
 //!   decode items for the two kinds of flash the firmware runs on.
-//! * The `ffi` module (behind the `bitwise` / `blockwise` features) exports
-//!   the C ABI of `norcow.h` and implements [`Flash`] on top of the C flash
-//!   driver. It is the only module that contains `unsafe` code.
 //!
 //! # Flash format
 //!
@@ -28,16 +23,9 @@
 //! `0xFFFF` and terminates the item list. When the write sector is full, the
 //! live items are copied to the next sector ("compaction").
 
-#![cfg_attr(not(any(test, feature = "std")), no_std)]
-#![deny(unsafe_code)]
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::ffi::CStr;
 
 mod layout;
-
-#[cfg(feature = "ffi")]
-mod ffi;
 
 #[cfg(test)]
 mod tests;
@@ -61,7 +49,7 @@ const KEY_LEN: u32 = 2;
 const LEN_LEN: u32 = 2;
 
 /// Length of the sector header that is preserved across erasures. Only 0 is
-/// supported; `norcow_rs_glue.c` asserts that the C configuration agrees.
+/// supported; `storage_rs_glue.c` asserts that the C configuration agrees.
 const HEADER_LEN: u32 = 0;
 
 /// Flash memory and build configuration that NORCOW runs on.
@@ -528,15 +516,20 @@ impl<F: Flash, L: Layout<F>> Norcow<F, L> {
         len: u16,
         found: &mut bool,
     ) -> bool {
-        // Key 0xFFFF is used as a marker to indicate that the entry is not set.
-        if key == KEY_FREE {
-            return false;
-        }
         let data = match src {
+            // Misuse; C could not check this.
             Some(src) if src.size() < usize::from(len) => return false,
             Some(src) => Data::Source(src),
             None => Data::Alloc,
         };
+        self.set_data(key, data, len, found)
+    }
+
+    fn set_data(&mut self, key: u16, data: Data<'_>, len: u16, found: &mut bool) -> bool {
+        // Key 0xFFFF is used as a marker to indicate that the entry is not set.
+        if key == KEY_FREE {
+            return false;
+        }
 
         let sector = self.write_sector;
         let old = self.find_item(sector, key);
@@ -592,6 +585,17 @@ impl<F: Flash, L: Layout<F>> Norcow<F, L> {
     ///
     /// Same as C: `count` is written on some failures too.
     pub fn next_counter(&mut self, key: u16, count: &mut u32) -> bool {
+        let mut written = None;
+        let ret = L::next_counter(self, key, &mut written);
+        if let Some(value) = written {
+            *count = value;
+        }
+        ret
+    }
+
+    /// Like [`Norcow::next_counter`], but reports whether `count` was
+    /// written (C writes it on some failures too).
+    pub fn next_counter_opt(&mut self, key: u16, count: &mut Option<u32>) -> bool {
         L::next_counter(self, key, count)
     }
 
@@ -602,6 +606,66 @@ impl<F: Flash, L: Layout<F>> Norcow<F, L> {
             return false;
         };
         L::update_bytes(self, key, Data::Source(&data), len)
+    }
+
+    /// Writes the next `src.size()` bytes of a value reserved with
+    /// [`Norcow::allocate`].
+    pub fn update_bytes_from(&mut self, key: u16, src: &dyn Source) -> bool {
+        let Ok(len) = u16::try_from(src.size()) else {
+            return false;
+        };
+        L::update_bytes(self, key, Data::Source(src), len)
+    }
+
+    /// Writes the next `len` bytes of a value reserved with
+    /// [`Norcow::allocate`], copying them from `offset` within a stored value.
+    /// Used by storage upgrades, which rewrite values in place.
+    pub fn update_bytes_copy(&mut self, key: u16, value: &Value, offset: u32, len: u16) -> bool {
+        if offset + u32::from(len) > u32::from(value.len) {
+            return false;
+        }
+        let data = Data::Flash {
+            sector: value.sector,
+            offset: value.offset + offset,
+        };
+        L::update_bytes(self, key, data, len)
+    }
+
+    /// Stores a copy of a value found by [`Norcow::get`] or
+    /// [`Norcow::get_next`] under `key`. Used by storage upgrades, which copy
+    /// items from the old sector to the new one.
+    pub fn set_copy(&mut self, key: u16, value: &Value) -> bool {
+        let data = Data::Flash {
+            sector: value.sector,
+            offset: value.offset,
+        };
+        let mut found = false;
+        self.set_data(key, data, value.len, &mut found)
+    }
+
+    /// Location of the value of an item returned by [`Norcow::get_next`].
+    pub fn item_value(&self, item: &Item) -> Value {
+        Value {
+            sector: self.active_sector,
+            offset: item.val_offset,
+            len: item.len,
+        }
+    }
+
+    /// Copies `buf.len()` bytes at `offset` within a stored value into `buf`.
+    pub fn read_at(&self, value: &Value, offset: u32, buf: &mut [u8]) -> bool {
+        match u32::try_from(buf.len()) {
+            Ok(len) if offset + len <= u32::from(value.len) => {
+                self.flash.read(value.sector, value.offset + offset, buf)
+            }
+            _ => false,
+        }
+    }
+
+    /// Reads a stored value of exactly `N` bytes.
+    pub fn read_exact<const N: usize>(&self, value: &Value) -> Option<[u8; N]> {
+        let mut buf = [0u8; N];
+        (usize::from(value.len) == N && self.read_at(value, 0, &mut buf)).then_some(buf)
     }
 
     /// Finishes a storage upgrade: drops the old sector.

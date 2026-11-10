@@ -1,5 +1,5 @@
 # trezor-client needs running emulator for test, handled in core.yml
-CRATES_TEST = trezor-norcow trezor-thp trezor-tjpgdec trezor-ward
+CRATES_TEST = trezor-storage trezor-thp trezor-tjpgdec trezor-ward
 CRATES = ${CRATES_TEST} trezor-client
 
 .PHONY: check audit
