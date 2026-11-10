@@ -765,6 +765,7 @@ dependencies = [
  "models",
  "rtl",
  "sys",
+ "trezor-norcow",
  "xbuild",
 ]
 
@@ -995,6 +996,10 @@ checksum = "d23e260001c4bb916c2710f5c80af007f4a760bce38302c2176dbb2053f051a5"
 dependencies = [
  "heapless",
 ]
+
+[[package]]
+name = "trezor-norcow"
+version = "0.1.0"
 
 [[package]]
 name = "trezor-thp"

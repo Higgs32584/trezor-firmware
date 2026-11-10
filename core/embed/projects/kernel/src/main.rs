@@ -3,4 +3,5 @@
 
 // force pull in Rust generated symbols (incl. the panic handler)
 use io as _;
+use sec as _; // incl. the Rust norcow used by storage.c
 use sys as _;

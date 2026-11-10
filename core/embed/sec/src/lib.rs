@@ -3,6 +3,11 @@
 #![feature(custom_test_frameworks)]
 #![reexport_test_harness_main = "test_main"]
 
+// Norcow is implemented in Rust; `storage.c` calls its C ABI. Nothing in Rust
+// refers to the crate, so pull it into the link explicitly.
+#[cfg(all(feature = "storage", feature = "secure_mode"))]
+extern crate trezor_norcow;
+
 #[cfg(test)]
 #[unsafe(no_mangle)]
 pub fn main() -> i32 {

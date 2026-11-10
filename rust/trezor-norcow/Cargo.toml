@@ -1,0 +1,31 @@
+[package]
+name = "trezor-norcow"
+version = "0.1.0"
+edition = "2024"
+description = "NORCOW flash key-value store used by the Trezor storage"
+license = "GPL-3.0-or-later"
+
+[features]
+# Export the C ABI of `storage/norcow.h` on top of the C flash driver
+# (`flash_area_*`) and the configuration glue in `storage/norcow_rs_glue.c`.
+# Enable it through one of the layout features below.
+ffi = []
+# Item layout for flash with bit access (`FLASH_BIT_ACCESS`,
+# `FLASH_BLOCK_WORDS == 1`): STM32F4 and all emulators.
+bitwise = ["ffi"]
+# Item layout for flash written in 16-byte blocks (`FLASH_BLOCK_WORDS == 4`):
+# STM32U5 hardware.
+#
+# If both layout features end up enabled (Cargo features are additive, and the
+# emulator of a STM32U5 model enables both), `bitwise` wins. This mirrors
+# `core/embed/sys/flash/build.rs`, which always uses bit access in the
+# emulator. A mismatch with the C configuration fails at link time.
+blockwise = ["ffi"]
+# Link against `std`. Only needed to build a host staticlib for the C test
+# harness in `storage/tests/c`.
+std = []
+
+[lib]
+# The test harness builds a staticlib with
+# `cargo rustc --lib --crate-type staticlib`; firmware links the rlib.
+crate-type = ["rlib"]

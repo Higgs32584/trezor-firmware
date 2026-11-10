@@ -18,9 +18,12 @@ pub fn def_module(lib: &mut CLibrary) -> Result<()> {
 
     lib.add_source("storage/storage_setup.c");
 
+    // Norcow is implemented in Rust (rust/trezor-norcow, linked through the
+    // `trezor-norcow` dependency of this crate). The glue passes it the C
+    // configuration. Trezor One (legacy) still builds norcow.c.
     lib.add_sources_in_dir(
         "../../vendor/trezor-storage/",
-        ["norcow.c", "storage.c", "storage_utils.c"],
+        ["norcow_rs_glue.c", "storage.c", "storage_utils.c"],
     );
 
     if cfg!(feature = "emulator") {
