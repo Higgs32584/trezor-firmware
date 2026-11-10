@@ -24,7 +24,7 @@ import typing as t
 import click
 import requests
 
-from .. import authentication, debuglink, device, exceptions, messages
+from .. import authentication, debuglink, device, exceptions, messages, models
 from ..tools import format_path
 from . import ChoiceType, ui, with_session
 
@@ -465,6 +465,24 @@ def authenticate(
 
     Development devices are rejected unless the --devel option is given.
     """
+    # Models which do not support authentication.
+    UNSUPPORTED_MODELS = (
+        models.T1B1,
+        models.T2T1,
+        models.D001,
+        models.D002,
+        models.D003,
+    )
+    if session.model in UNSUPPORTED_MODELS:
+        raise click.ClickException(
+            f"Device authentication is not supported on Trezor {session.model.name}."
+        )
+    if not authentication.roots_for_model(session.model):
+        raise click.ClickException(
+            f"This version of trezorlib cannot authenticate Trezor {session.model.name}. "
+            "Please update trezorlib."
+        )
+
     if hex_challenge is None:
         hex_challenge = secrets.token_hex(32)
 
@@ -533,7 +551,7 @@ def authenticate(
             ) from e
 
     try:
-        authentication.authenticate_device(
+        root = authentication.authenticate_device(
             session,
             challenge,
             p256_root_pubkey=p256_root_bytes,
@@ -543,8 +561,21 @@ def authenticate(
             allow_development_devices=devel,
         )
     except authentication.DeviceNotAuthentic:
-        click.echo("Device is not authentic.")
+        click.echo(f"Device is {click.style('NOT authentic', bold=True)}.")
         sys.exit(5)
+    except exceptions.OutdatedFirmwareError as e:
+        click.echo(e.message)
+        sys.exit(5)
+    else:
+        if root is None:
+            result = "authentic (custom root)"
+        elif root.devel:
+            result = "DEVEL"
+        else:
+            result = "authentic"
+
+        model_name = click.style(f"Trezor {session.model.name}", bold=True)
+        click.echo(f"Device {model_name} is {click.style(result, bold=True)}.")
 
 
 @cli.command()
