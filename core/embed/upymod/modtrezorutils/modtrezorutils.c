@@ -214,6 +214,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_trezorutils_halt_obj, 0, 1,
 ///     """
 static mp_obj_t mod_trezorutils_firmware_hash(size_t n_args,
                                               const mp_obj_t *args) {
+  ts_t status;
   mp_buffer_info_t chal = {0};
   if (n_args > 0 && args[0] != mp_const_none) {
     mp_get_buffer_raise(args[0], &chal, MP_BUFFER_READ);
@@ -225,24 +226,26 @@ static mp_obj_t mod_trezorutils_firmware_hash(size_t n_args,
   }
 
   vstr_t vstr = {0};
-  vstr_init_len(&vstr, BLAKE2S_DIGEST_LENGTH);
+  vstr_init_len(&vstr, sizeof(firmware_hash_t));
 
-  if (firmware_hash_start(chal.buf, chal.len) < 0) {
+  status = firmware_hash_start(chal.buf, chal.len);
+  if (ts_error(status)) {
     vstr_clear(&vstr);
+    if (ts_eq(status, TS_EINVAL)) {
+      mp_raise_msg(&mp_type_ValueError, MP_ERROR_TEXT("Invalid challenge."));
+    }
     mp_raise_msg(&mp_type_RuntimeError,
                  MP_ERROR_TEXT("Failed to start firmware hash."));
   }
 
-  int progress = 0;
+  int32_t progress = 0;
 
   while (progress < 100) {
-    progress = firmware_hash_continue((uint8_t *)vstr.buf, vstr.len);
-
-    if (progress < 0) {
+    status = firmware_hash_continue((firmware_hash_t *)vstr.buf, &progress);
+    if (ts_error(status)) {
       vstr_clear(&vstr);
       mp_raise_msg(&mp_type_RuntimeError,
                    MP_ERROR_TEXT("Failed to calculate firmware hash."));
-      break;
     }
 
     if (mp_obj_is_callable(ui_wait_callback)) {
@@ -266,7 +269,8 @@ static mp_obj_t mod_trezorutils_firmware_vendor(void) {
   return mp_obj_new_str_copy(&mp_type_str, (const uint8_t *)"EMULATOR", 8);
 #else
   char vendor[64] = {0};
-  if (sectrue != firmware_get_vendor(vendor, sizeof(vendor))) {
+  ts_t status = firmware_get_vendor(vendor, sizeof(vendor));
+  if (ts_error(status)) {
     mp_raise_msg(&mp_type_RuntimeError,
                  MP_ERROR_TEXT("Failed to read vendor header."));
   }
@@ -490,18 +494,31 @@ static MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_clear_gc_info_obj,
 ///     def get_gc_info() -> dict[str, int]:
 ///         """
 ///         Get GC heap stats, updated by `update_gc_info`.
+///         `used_{min,max}` are measured after each collection (since
+///         the last call), so they exclude garbage freed by that collection.
 ///         """
 static mp_obj_t mod_trezorutils_get_gc_info() {
-  mp_obj_t result = mp_obj_new_dict(4);
+  mp_obj_t result = mp_obj_new_dict(7);
+  mp_obj_dict_store(result, MP_OBJ_NEW_QSTR(MP_QSTR_count),
+                    mp_obj_new_int_from_uint(MP_STATE_MEM(gc_count)));
   mp_obj_dict_store(result, MP_OBJ_NEW_QSTR(MP_QSTR_total),
                     mp_obj_new_int_from_uint(current_gc_info.total));
   mp_obj_dict_store(result, MP_OBJ_NEW_QSTR(MP_QSTR_used),
                     mp_obj_new_int_from_uint(current_gc_info.used));
+  mp_obj_dict_store(result, MP_OBJ_NEW_QSTR(MP_QSTR_used_max),
+                    mp_obj_new_int_from_uint(MP_STATE_MEM(gc_used_blocks_max) *
+                                             MICROPY_BYTES_PER_GC_BLOCK));
+  mp_obj_dict_store(result, MP_OBJ_NEW_QSTR(MP_QSTR_used_min),
+                    mp_obj_new_int_from_uint(MP_STATE_MEM(gc_used_blocks_min) *
+                                             MICROPY_BYTES_PER_GC_BLOCK));
   mp_obj_dict_store(result, MP_OBJ_NEW_QSTR(MP_QSTR_free),
                     mp_obj_new_int_from_uint(current_gc_info.free));
   mp_obj_dict_store(result, MP_OBJ_NEW_QSTR(MP_QSTR_max_free),
                     mp_obj_new_int_from_uint(current_gc_info.max_free *
                                              MICROPY_BYTES_PER_GC_BLOCK));
+  MP_STATE_MEM(gc_count) = 0;
+  MP_STATE_MEM(gc_used_blocks_max) = 0;
+  MP_STATE_MEM(gc_used_blocks_min) = 0;
   return result;
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_get_gc_info_obj,

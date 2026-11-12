@@ -26,7 +26,6 @@
 #include "messages-debug.pb.h"
 #include "messages-ethereum.pb.h"
 #include "messages-management.pb.h"
-#include "messages-nem.pb.h"
 #include "messages-stellar.pb.h"
 #include "messages.pb.h"
 
@@ -116,14 +115,6 @@ void fsm_msgEthereumSignMessage(const EthereumSignMessage *msg);
 void fsm_msgEthereumVerifyMessage(const EthereumVerifyMessage *msg);
 void fsm_msgEthereumSignTypedHash(const EthereumSignTypedHash *msg);
 
-// nem
-void fsm_msgNEMGetAddress(
-    NEMGetAddress *msg);  // not const because we mutate msg->network
-void fsm_msgNEMSignTx(
-    NEMSignTx *msg);  // not const because we mutate msg->network
-void fsm_msgNEMDecryptMessage(
-    NEMDecryptMessage *msg);  // not const because we mutate msg->payload
-
 // stellar
 void fsm_msgStellarGetAddress(const StellarGetAddress *msg);
 void fsm_msgStellarSignTx(const StellarSignTx *msg);
@@ -151,6 +142,7 @@ bool fsm_layoutVerifyMessage(const uint8_t *msg, uint32_t len);
 
 bool fsm_layoutPathWarning(void);
 bool fsm_layoutDifferentPathsWarning(void);
+bool fsm_checkXpubExport(uint32_t address_n_count, const uint32_t *address_n);
 bool fsm_checkCoinPath(const CoinInfo *coin, InputScriptType script_type,
                        uint32_t address_n_count, const uint32_t *address_n,
                        bool has_multisig, MessageType message_type,

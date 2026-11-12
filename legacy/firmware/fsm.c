@@ -58,8 +58,6 @@
 #include "ethereum.h"
 #include "ethereum_definitions.h"
 #include "ethereum_networks.h"
-#include "nem.h"
-#include "nem2.h"
 #include "stellar.h"
 #endif
 
@@ -501,6 +499,23 @@ bool fsm_layoutPathWarning(void) {
   return true;
 }
 
+bool fsm_checkXpubExport(uint32_t address_n_count, const uint32_t *address_n) {
+  if (!is_xpub_export_restricted(address_n_count, address_n)) {
+    return true;
+  }
+
+  layoutDialogSwipe(&bmp_icon_warning, _("Abort"), _("Continue"), NULL,
+                    _("A quantum computer"), _("could use this key to"),
+                    _("reveal all keys"), _("derived from it."),
+                    _("Continue at own risk!"), NULL);
+  if (!protectButton(ButtonRequestType_ButtonRequest_UnknownDerivationPath,
+                     false)) {
+    fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+    return false;
+  }
+  return true;
+}
+
 bool fsm_layoutDifferentPathsWarning(void) {
   layoutDialogSwipe(&bmp_icon_warning, _("Abort"), _("Continue"), NULL,
                     _("Using different paths"), _("for different XPUBs."), NULL,
@@ -520,7 +535,6 @@ bool fsm_layoutDifferentPathsWarning(void) {
 #if !BITCOIN_ONLY
 
 #include "fsm_msg_ethereum.h"
-#include "fsm_msg_nem.h"
 #include "fsm_msg_stellar.h"
 
 #endif

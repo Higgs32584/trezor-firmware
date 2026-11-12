@@ -41,8 +41,8 @@ The tests are randomized using the [pytest-random-order] plugin. The random seed
 If you only want to run a particular test, pick it with `-k <keyword>` or `-m <marker>`:
 
 ```sh
-pytest -k nem      # only runs tests that have "nem" in the name
-pytest -k "nem or stellar"  # only runs tests that have "nem" or "stellar" in the name
+pytest -k ripple   # only runs tests that have "ripple" in the name
+pytest -k "ripple or stellar"  # only runs tests that have "ripple" or "stellar" in the name
 pytest -m stellar  # only runs tests marked with @pytest.mark.stellar
 ```
 
@@ -170,7 +170,7 @@ DebugLink interface supports polling the device for its current [GC-related info
 
 On every test setup/teardown, we check for whether the free memory has decreased (indicating that the GC didn't free all allocated heap memory).
 
-By default, the test will fail if a leak is detected. In order to issue a warning instead, use `--ignore-gc-leak` CLI flag.
+By default, the test will fail if a leak is detected. In order to issue a warning instead, use `--warn-on-gc-leak` CLI flag.
 
 ## 5. Running tests on hardware over BLE
 
