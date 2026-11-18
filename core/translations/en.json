@@ -1101,7 +1101,14 @@
     },
     "language__change_to_template": "Change language to {0}?",
     "language__changed": "Language changed successfully.",
+    "language__czech": "Czech",
+    "language__english": "English",
+    "language__french": "French",
+    "language__german": "German",
+    "language__indonesian": "Indonesian",
+    "language__portuguese": "Portuguese",
     "language__progress": "Changing language...",
+    "language__spanish": "Spanish",
     "language__title": "Language settings",
     "led__disable": {
       "Bolt": "",
@@ -1481,7 +1488,7 @@
       "Bolt": "",
       "Caesar": "",
       "Delizia": "",
-      "Eckhart": "Share doesn't match"
+      "Eckhart": "Share doesn't match."
     },
     "recovery__share_from_another_multi_share_backup": "You have entered a share from a different backup.",
     "recovery__share_from_group_entered_template": {
@@ -1523,18 +1530,8 @@
       "Delizia": "{count} more {plural} starting",
       "Eckhart": "You need {count} more {plural} starting"
     },
-    "recovery__x_more_shares_needed_template_plural": {
-      "Bolt": "{count} more {plural} needed",
-      "Caesar": "{count} more {plural} needed.",
-      "Delizia": "{count} more {plural} needed",
-      "Eckhart": "{count} more {plural} needed."
-    },
-    "recovery__x_of_y_entered_template": {
-      "Bolt": "{0} of {1} shares entered",
-      "Caesar": "{0} of {1} shares entered.",
-      "Delizia": "{0} of {1} shares entered",
-      "Eckhart": "{0} of {1} shares entered."
-    },
+    "recovery__x_more_shares_needed_template_plural": "{count} more {plural} needed.",
+    "recovery__x_of_y_entered_template": "{0} of {1} shares entered.",
     "recovery__you_have_entered": {
       "Bolt": "You have entered",
       "Caesar": "You have entered",
@@ -2293,7 +2290,12 @@
     "solana__claim_question": "Claim SOL from stake account?",
     "solana__claim_recipient_warning": "Claiming SOL to address outside your current wallet.",
     "solana__confirm_multisig": "Confirm multisig",
-    "solana__details_not_reviewed": "You are about to sign without reviewing the transaction details.",
+    "solana__details_not_reviewed": {
+      "Bolt": "",
+      "Caesar": "",
+      "Delizia": "",
+      "Eckhart": "You are about to sign without reviewing the transaction details."
+    },
     "solana__expected_fee": "Expected fee",
     "solana__instruction_accounts_template": "Instruction contains {0} accounts and its data is {1} bytes long.",
     "solana__instruction_data": "Instruction data",
@@ -2304,15 +2306,30 @@
     "solana__multiple_signers": "Multiple signers",
     "solana__offchain_is_multisig": "The following message requires multiple signers.",
     "solana__priority_fee": "Priority fee",
-    "solana__skip_details": "Skip details",
-    "solana__skip_details_hint": "If you are experiencing timeouts, skip straight to signing in the menu.",
+    "solana__skip_details": {
+      "Bolt": "",
+      "Caesar": "",
+      "Delizia": "Skip details",
+      "Eckhart": "Skip details"
+    },
+    "solana__skip_details_hint": {
+      "Bolt": "",
+      "Caesar": "",
+      "Delizia": "If you are experiencing timeouts, skip straight to signing in the menu.",
+      "Eckhart": "If you are experiencing timeouts, skip straight to signing in the menu."
+    },
     "solana__stake": "Stake",
     "solana__stake_account": "Stake account",
     "solana__stake_on_question": "Stake SOL on {0}?",
     "solana__stake_question": "Stake SOL?",
     "solana__stake_withdrawal_warning": "The current wallet isn't the SOL staking withdraw authority.",
     "solana__stake_withdrawal_warning_title": "Withdraw authority address",
-    "solana__title_blind_signing": "Blind signing",
+    "solana__title_blind_signing": {
+      "Bolt": "",
+      "Caesar": "",
+      "Delizia": "Blind signing",
+      "Eckhart": "Blind signing"
+    },
     "solana__transaction_contains_unknown_instructions": "Transaction contains unknown instructions.",
     "solana__transaction_requires_x_signers_template": "Transaction requires {0} signers which increases the fee.",
     "solana__unknown_token": "Unknown token",
@@ -2324,7 +2341,12 @@
     },
     "solana__unstake": "Unstake",
     "solana__unstake_question": "Unstake SOL from stake account?",
-    "solana__view_details_in_menu": "View details in the menu.",
+    "solana__view_details_in_menu": {
+      "Bolt": "",
+      "Caesar": "",
+      "Delizia": "",
+      "Eckhart": "View details in the menu."
+    },
     "solana__vote_account": "Vote account",
     "stellar__account_merge": "Account Merge",
     "stellar__account_thresholds": "Account Thresholds",
