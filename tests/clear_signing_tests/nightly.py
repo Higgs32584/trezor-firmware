@@ -38,7 +38,12 @@ from pathlib import Path
 import click
 import requests
 from mako.template import Template
-from registry import definitions_source, load_cases, read_results
+from registry import (
+    RegistryCase,
+    definitions_source,
+    load_cases,
+    read_results,
+)
 
 from trezorlib import definitions
 
@@ -334,6 +339,14 @@ SUMMARY_TEMPLATE = Path(__file__).resolve().parent / "summary.md.mako"
 MAX_LINES = 300
 
 
+def _skipped_line(case: RegistryCase) -> str:
+    """A skipped case, with the registry test file (descriptor) it comes from."""
+    line = f"- `{case.test_id}` in `{case.test_file}`"
+    if case.tx is not None:
+        line += f": {len(case.tx.data)} bytes of calldata"
+    return line
+
+
 @dataclass
 class _ModelRow:
     model: str
@@ -395,8 +408,10 @@ def summarize(
     rows: list[_ModelRow] = []
     # test_id -> ["T3W1: error DataError: ...", ...]
     problems: dict[str, list[str]] = defaultdict(list)
-    # test_id -> models
+    # test_id -> models; blind-signed although the dev definitions have a display format
     blind: dict[str, list[str]] = defaultdict(list)
+    # test_id -> models; blind-signed, the dev definitions have no display format
+    no_format: dict[str, list[str]] = defaultdict(list)
     # test_id -> (models, missing texts)
     not_found: dict[str, tuple[list[str], list[str]]] = {}
     for model in models:
@@ -405,12 +420,16 @@ def summarize(
         for case in to_run:
             result = model_results.get(case.test_id)
             status = result["status"] if result else "not run"
+            if status == "blind" and not case.has_display_format:
+                status = "blind, no format"
             counts[status] += 1
             if status == "clear_signed":
                 if result and (missing := result.get("missing")):
                     counts["text not found"] += 1
                     entry = not_found.setdefault(case.test_id, ([], missing))
                     entry[0].append(model)
+            elif status == "blind, no format":
+                no_format[case.test_id].append(model)
             elif status == "blind":
                 blind[case.test_id].append(model)
             else:
@@ -424,15 +443,20 @@ def summarize(
             _ModelRow(model, counts, report_url, differing_url, baseline.get(model))
         )
 
-    skipped = Counter(case.skip_reason for case in cases if case.skip_reason)
+    # skip reason -> cases
+    skipped: dict[str, list[str]] = defaultdict(list)
+    for case in cases:
+        if case.skip_reason:
+            skipped[case.skip_reason].append(_skipped_line(case))
     summary = Template(filename=str(SUMMARY_TEMPLATE), strict_undefined=True).render(
         inputs=inputs,
         total=len(cases),
         run=len(to_run),
         rows=rows,
-        skipped=skipped.most_common(),
+        skipped=sorted(skipped.items(), key=lambda item: -len(item[1])),
         problems=sorted(problems.items()),
         blind=sorted(blind.items()),
+        no_format=sorted(no_format.items()),
         not_found=sorted(not_found.items()),
         max_lines=MAX_LINES,
     )
